@@ -3,7 +3,7 @@ import torch
 import random
 
 def run(args):
-    net = getattr(graca.models, args.model)
+    net = getattr(graca.models, args.model)()
     net = net.cuda()
     optimizer = torch.optim.Adam(net.parameters(), 1e-4)
     rmse_tr_lr = [0 for _ in range(args.n_epochs)]
@@ -86,3 +86,5 @@ if __name__ == "__main__":
     parser.add_argument("--n_epochs", type=str, default=300)
     parser.add_argument("--model", type=str, default="GMN")
     parser.add_argument("--out", default=None)
+    args = parser.parse_args()
+    run(args)
