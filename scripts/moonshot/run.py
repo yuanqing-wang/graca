@@ -72,7 +72,7 @@ def run(args):
     rmse_te_rl = (rmse_te_rl / len(ds_te)) ** 0.5
 
     if args.out is None:
-        args.out = args.model
+        args.out = args.model + str(args.train_lr) + str(args.train_rl)
 
     np.save(args.out + "/rmse_tr_lr.npy", rmse_tr_lr)
     np.save(args.out + "/rmse_tr_rl.npy", rmse_tr_lr)
@@ -86,5 +86,7 @@ if __name__ == "__main__":
     parser.add_argument("--n_epochs", type=str, default=300)
     parser.add_argument("--model", type=str, default="GMN")
     parser.add_argument("--out", default=None)
+    parser.add_argument("--train_lr", type=bool, default=True)
+    parser.add_argument("--train_rl", type=bool, default=True)
     args = parser.parse_args()
     run(args)

@@ -1,7 +1,12 @@
+import graca
+
+
 def moonshot():
+    
     from dgllife.utils import smiles_to_bigraph, CanonicalAtomFeaturizer
     import pandas as pd
-    df = pd.read_csv("covid_submissions_all_info.csv")
+    import os
+    df = pd.read_csv(os.path.dirname(graca.data.collections.__file__) + "/covid_submissions_all_info.csv")
     df = df.dropna(subset=["f_avg_pIC50"])
     pairs = []
     for idx, row in df.dropna(subset=['f_avg_pIC50']).iterrows():
