@@ -8,58 +8,29 @@ def moonshot():
     import os
     df = pd.read_csv(os.path.dirname(graca.data.collections.__file__) + "/covid_submissions_all_info.csv")
     df = df.dropna(subset=["f_avg_pIC50"])
-    pairs = []
-    for idx, row in df.dropna(subset=['f_avg_pIC50']).iterrows():
-        candidates = row['inspired_by']
-        if not isinstance(candidates, str):
-            continue
-        candidates = candidates.split(",")
 
-        for candidate in candidates:
-            if len(df.where(df['CID']==candidate).dropna(subset=['CID']).index) > 0:
-                pairs.append((idx, df.where(df['CID']==candidate).dropna(subset=['CID']).index.item()))
+    from rdkit import Chem
+    from rdkit.Chem import MCS
 
-
-    pairs_tr = pairs[:100]
-    pairs_te = pairs[100:]
-
-    _pairs_tr = list(zip(*pairs_tr))
-    _pairs_te = list(zip(*pairs_te))
-
-    _ds_tr = [
-        (
-            smiles_to_bigraph(df.loc[x]["SMILES"], node_featurizer=CanonicalAtomFeaturizer(atom_data_field='feat')),
-            df.loc[x]["f_avg_pIC50"],
-        )
-        for x in set(_pairs_tr[0])
-    ]
-
-    _ds_te = [
-        (
-            smiles_to_bigraph(df.loc[x]["SMILES"], node_featurizer=CanonicalAtomFeaturizer(atom_data_field='feat')),
-            df.loc[x]["f_avg_pIC50"],
-        )
-        for x in set(_pairs_te[0])
-    ]
-
-    ds_tr = [
-          (
-              smiles_to_bigraph(df.loc[x]["SMILES"], node_featurizer=CanonicalAtomFeaturizer(atom_data_field='feat')),
-              smiles_to_bigraph(df.loc[y]["SMILES"], node_featurizer=CanonicalAtomFeaturizer(atom_data_field='feat')),
-              df.loc[x]["f_avg_pIC50"],
-              df.loc[y]["f_avg_pIC50"]
-          )
-          for x, y in pairs_tr
-    ]
-
-    ds_te = [
-          (
-              smiles_to_bigraph(df.loc[x]["SMILES"], node_featurizer=CanonicalAtomFeaturizer(atom_data_field='feat')),
-              smiles_to_bigraph(df.loc[y]["SMILES"], node_featurizer=CanonicalAtomFeaturizer(atom_data_field='feat')),
-              df.loc[x]["f_avg_pIC50"],
-              df.loc[y]["f_avg_pIC50"]
-          )
-          for x, y in pairs_te
-    ]
-
+    ds = []
+    for idx0, row0 in df.iterrows():
+        smiles0 = row0["SMILES"]
+        mol0 = Chem.MolFromSmiles(smiles0)
+        for idx1, row1 in df.iloc[idx0+1:].iterrows():
+            smiles1 = row1["SMILES"]
+            mol1 = Chem.MolFromSmiles(smiles1)
+            res = MCS.FindMCS([mol0, mol1])
+            if res.numAtoms > 15:
+                ds.append(
+                    (
+                        mol_to_bigraph(mol1, node_featurizer=CanonicalAtomFeaturizer(atom_data_field='feat')),
+                        mol_to_bigraph(mol0, node_featurizer=CanonicalAtomFeaturizer(atom_data_field='feat')),
+                        row1["f_avg_pIC50"],
+                        row0["f_avg_pIC50"],
+                    )
+                )
+                
+    ds_tr = ds[:500]
+    ds_te = ds[500:]
+            
     return ds_tr, ds_te
