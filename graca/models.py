@@ -48,71 +48,6 @@ class GMN(torch.nn.Module):
             torch.nn.ReLU(),
             torch.nn.Linear(hidden_features, out_features)
         )
-        self.gmn = GMN()
-
-    def forward(self, gl, gr):
-        gl = gl.local_var()
-        gr = gr.local_var()
-        xl = gl.ndata["feat"]
-        xr = gr.ndata["feat"]
-        for idx in range(self.depth):
-            mu_lr, mu_rl = self.gmn(xl, xr)
-            gl.ndata["x"] = xl
-            gr.ndata["x"] = xr
-            gl.update_all(dgl.function.copy_src(src='x', out='m'),
-                             dgl.function.sum(msg='m', out='x'))
-
-            xl = gl.ndata["x"]
-            xr = gr.ndata["x"]
-
-            xl = torch.cat([xl, mu_rl], dim=-1)
-            xr = torch.cat([xr, mu_lr], dim=-1)
-
-            xl = getattr(self, "ff%s"%idx)(xl)
-            xr = getattr(self, "ff%s"%idx)(xr)
-
-        gl.ndata["x"] = xl
-        gr.ndata["x"] = xr
-
-        xl = dgl.sum_nodes(gl, "x")
-        xr = dgl.sum_nodes(gr, "x")
-        x = self.ff(
-            torch.cat(
-                [xl, xr], dim=-1
-            )
-        )
-
-class GMN(torch.nn.Module):
-    def __init__(
-        self,
-        depth=3,
-        in_features=74,
-        hidden_features=128,
-        out_features=1,
-    ):
-        super(GMN, self).__init__()
-        _in_features = 2 * in_features
-        _out_features = hidden_features
-        for idx in range(depth):
-
-            setattr(
-                self,
-                "ff%s" % idx,
-                torch.nn.Sequential(
-                    torch.nn.Linear(_in_features, _out_features),
-                    torch.nn.ReLU(),
-                )
-            )
-
-            _in_features = 2 * hidden_features
-
-
-        self.depth = depth
-        self.ff = torch.nn.Sequential(
-            torch.nn.Linear(2*hidden_features, hidden_features),
-            torch.nn.ReLU(),
-            torch.nn.Linear(hidden_features, out_features)
-        )
         self.attention = Attention()
 
     def forward(self, gl, gr):
@@ -149,6 +84,73 @@ class GMN(torch.nn.Module):
                 [xl, xr], dim=-1
             )
         )
+
+        return x
+
+
+class GMNEq(torch.nn.Module):
+    def __init__(
+        self,
+        depth=3,
+        in_features=74,
+        hidden_features=128,
+        out_features=1,
+    ):
+        super(GMNEq, self).__init__()
+        _in_features = 2 * in_features
+        _out_features = hidden_features
+        for idx in range(depth):
+
+            setattr(
+                self,
+                "ff%s" % idx,
+                torch.nn.Sequential(
+                    torch.nn.Linear(_in_features, _out_features),
+                    torch.nn.ReLU(),
+                )
+            )
+
+            _in_features = 2 * hidden_features
+
+
+        self.depth = depth
+        self.ff = torch.nn.Sequential(
+            torch.nn.Linear(hidden_features, hidden_features, bias=False),
+            torch.nn.Tanh(),
+            torch.nn.Linear(hidden_features, out_features, bias=False)
+        )
+        self.attention = Attention()
+
+    def forward(self, gl, gr):
+        gl = gl.local_var()
+        gr = gr.local_var()
+        xl = gl.ndata["feat"]
+        xr = gr.ndata["feat"]
+        for idx in range(self.depth):
+            mu_lr, mu_rl = self.attention(xl, xr)
+            gl.ndata["x"] = xl
+            gr.ndata["x"] = xr
+            gl.update_all(dgl.function.copy_src(src='x', out='m'),
+                             dgl.function.sum(msg='m', out='x'))
+            gr.update_all(dgl.function.copy_src(src='x', out='m'),
+                             dgl.function.sum(msg='m', out='x'))
+
+
+            xl = gl.ndata["x"]
+            xr = gr.ndata["x"]
+
+            xl = torch.cat([xl, mu_rl], dim=-1)
+            xr = torch.cat([xr, mu_lr], dim=-1)
+
+            xl = getattr(self, "ff%s"%idx)(xl)
+            xr = getattr(self, "ff%s"%idx)(xr)
+
+        gl.ndata["x"] = xl
+        gr.ndata["x"] = xr
+
+        xl = dgl.sum_nodes(gl, "x")
+        xr = dgl.sum_nodes(gr, "x")
+        x = self.ff(xl - xr)
 
         return x
 

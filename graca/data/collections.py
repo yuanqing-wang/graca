@@ -3,7 +3,7 @@ import graca
 
 def moonshot():
     
-    from dgllife.utils import smiles_to_bigraph, CanonicalAtomFeaturizer
+    from dgllife.utils import mol_to_bigraph, CanonicalAtomFeaturizer
     import pandas as pd
     import os
     df = pd.read_csv(os.path.dirname(graca.data.collections.__file__) + "/covid_submissions_all_info.csv")
